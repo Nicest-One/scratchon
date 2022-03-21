@@ -22,7 +22,9 @@ if response:
     Distribute(file="file ex. C:/Users/Python/module.py", auth=code)
 else:
     module = Parse("file ex. C:/Users/Python/module.py")
-    Create(module)
+    code, response = Create(module)
+    print(code)
+    #save the value of the variable code
 ````
 
 ### Support?
