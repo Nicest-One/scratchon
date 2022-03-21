@@ -1,21 +1,29 @@
-# scratchon
-A Python and Scratch Project Connector!
+# scratchon developer branch
+The official way to make your own scratchon module! 
 
 ### Installation
 ```
-pip install scratchon
+git clone -b developer https://github.com/Nicest-One/scratchon
 ```
 
 ### Get started
-How to set up a client connection:
+Import utilities
 
-```Python
-import scratchon
-
-# Instantiate a client object
-account = scratchon.Client('scratch_username', 'scratch_password')
+```python
+from scratchon.build.module_maker import Distribute, Parse, Create, Check
 ```
+
+### Now you can create your own module.
+```python
+#check if module name avialable
+response = Check(module_name='my_module', check_for="name")
+if response:
+    code = "your module code (the one obtained from creating your scratchon module"
+    Distribute(file="file ex. C:/Users/Python/module.py", auth=code)
+else:
+    module = Parse("file ex. C:/Users/Python/module.py")
+    Create(module)
+````
 
 ### Support?
 #### Discord Server: https://discord.com/invite/tF7j7MswUS
-#### Documentation: https://scratch.mit.edu/projects/655866524/fullscreen/
