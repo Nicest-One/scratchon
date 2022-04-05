@@ -7,11 +7,12 @@ from colorama import Fore
 import threading
 import time
 import asyncio
+import inspect
 import os
 
 
 class Client:
-    def __init__(self, username, password):
+    def __init__(self, username, password, source=None):
         """
         Creates a Scratch Client so you can start connecting to your projects.
         *Note: Your Password and Username are not stored both globally and locally!
@@ -19,6 +20,7 @@ class Client:
 
         :param username: Your Scratch Username
         :param password: Your Scratch Password
+        :Param source: Normally set this param to __file__ to allow suggested lines
 
         :return: None
         :rtype: Undefined
@@ -27,12 +29,9 @@ class Client:
         self.sessionID = None
         self.discord_link = "https://discord.gg/tF7j7MswUS"
 
-        self.chars = """
-            AabBCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789 -_`~!@#$%^&*()+=[];:'"|,.<>/?}{\
-        """
-
         self.username = username
         self.password = password
+        self.source = source
 
         self.headers = {
             "x-csrftoken": "a",
@@ -70,19 +69,25 @@ class Client:
             ).group(1)
 
         except AttributeError as error:
-            self.error_proxy = error
-            self.file = open(__file__, "r", encoding='UTF-8')
-            self.line = ""
-            self.count = 0
-            for i in self.file:
-                self.count += 1
-                if 'client' in i.lower():
-                    self.line = i
-                    break
+            if source != None:
+                self.error_proxy = error
 
-            self.message = f"{Fore.RED}[scratchon] Invalid Credentials!\n{Fore.YELLOW}  Tip: Double check to make sure your username and password are correct\n {Fore.BLUE} Suggested Line:\n   {Fore.WHITE} Line: {self.count} | {self.line}  {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+                self.file = open(self.source, "r", encoding='UTF-8')
+                self.line = ""
+                self.count = 0
+                for i in self.file:
+                    self.count += 1
+                    if 'client' in i.lower():
+                        self.line = i
+                        break
 
-            print(self.message)
+                self.message = f"{Fore.RED}[scratchon] Invalid Credentials!\n{Fore.YELLOW}  Tip: Double check to make sure your username and password are correct\n {Fore.BLUE} Suggested Line:\n   {Fore.WHITE} Line: {self.count} | {self.line}  {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+
+                print(self.message)
+            else:
+                self.message = f"{Fore.RED}[scratchon] Invalid Credentials!\n{Fore.YELLOW}  Tip: Double check to make sure your username and password are correct\n {Fore.BLUE} Suggested Line:\n   {Fore.WHITE} Define source in Client() to get suggestions\n    scratchon.Client(source=__file__, ...) {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+
+                print(self.message)
 
         else:
 
@@ -106,7 +111,13 @@ class Client:
         :return: Project instance
         :rtype: object
         """
-        return Manage(project_id, self.sessionId, self.username, self.discord_link)
+
+        try:
+            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source)
+        except:
+            self.message = f"{Fore.RED}[scratchon] Prior Exception\n{Fore.YELLOW}  Tip: Check to see if any error's occured prior to this message\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+
+            print(self.message)
 
 
 class Variable:
@@ -130,17 +141,99 @@ class Variable:
         self.object = origin
 
 
+class CodecMethod:
+    DEFAULT = {
+        'a': 10,
+        'b': 11,
+        'c': 12,
+        'd': 13,
+        'e': 14,
+        'f': 15,
+        'g': 16,
+        'h': 17,
+        'i': 18,
+        'j': 19,
+        'k': 20,
+        'l': 21,
+        'm': 22,
+        'n': 23,
+        'o': 24,
+        'p': 25,
+        'q': 26,
+        'r': 27,
+        's': 28,
+        't': 29,
+        'u': 30,
+        'v': 31,
+        'w': 32,
+        'x': 33,
+        'y': 34,
+        'z': 35,
+        '1': 36,
+        '2': 37,
+        '3': 38,
+        '4': 39,
+        '5': 40,
+        '6': 41,
+        '7': 42,
+        '8': 43,
+        '9': 44,
+        '0': 45,
+        '!': 46,
+        '@': 47,
+        '#': 48,
+        '$': 49,
+        '%': 50,
+        '^': 51,
+        '&': 52,
+        '*': 53,
+        '(': 54,
+        ')': 55,
+        '{': 56,
+        '}': 57,
+        '[': 58,
+        ']': 59,
+        '|': 60,
+        ':': 61,
+        ';': 62,
+        '"': 63,
+        '\'': 64,
+        '<': 65,
+        ',': 66,
+        '>': 67,
+        '.': 68,
+        '?': 69,
+        '\\': 70,
+        '/': 71,
+        '`': 72,
+        '~': 73,
+        '☁': 74,
+        ' ': 75,
+        '-': 76,
+        '_': 77,
+        '+': 78,
+        '=': 79,
+    }
+
+    @staticmethod
+    def from_file(file_path):
+        if os.path.isfile(file_path):
+            print(f'using {file_path} as the encoding method!')
+        else:
+            print('Make sure the file path is correct!')
+
 
 class Manage:
-    def __init__(self, project_id, session_id, username, discord_link):
+    def __init__(self, project_id, session_id, username, discord_link, source, codec_method=CodecMethod.DEFAULT):
         """
-        A(n) object that represents your scratch project
+        A(n) object that represents your scratch project, not meant to be used by the user.
 
 
         :param project_id: Undefined
         :param session_id: Undefined
         :param username: Undefined
         :param discord_link: https://discord.gg/tF7j7MswUS
+        :param codec_method: Undefined
         """
 
         self.ws = websocket.WebSocket()
@@ -151,11 +244,14 @@ class Manage:
         self.discord_link = discord_link
         self.var_object = None
         self.stats, self.message, self.counter = None, None, 0
+        self.source = source
 
         self.callback_directory = {}
-        self.event_dictionary = ['cloud_update', 'connected']
+        self.event_dictionary = ['cloud_update', 'connected', 'tick']
         self.responses = []
         self.cloud_last_values = {}
+
+        self.receive_type = None
 
         self.ws.connect('wss://clouddata.scratch.mit.edu', cookie='scratchsessionsid=' + self.session_id + ';',
                         origin='https://scratch.mit.edu', enable_multithread=True)
@@ -169,7 +265,8 @@ class Manage:
         def call_scratch_api():
             while self.websocket_connected:
                 try:
-                    self.response = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" + str(self.project_id) + "&limit=1" + "&offset=0").json()
+                    self.response = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" + str(
+                        self.project_id) + "&limit=1" + "&offset=0").json()
                     self.response = self.response[0]
                     self.var_name = self.response['name']
                     self.var_value = self.response['value']
@@ -179,20 +276,26 @@ class Manage:
 
                     if self.cloud_last_values[self.var_name] != self.var_value:
                         if 'cloud_update' in self.callback_directory.keys():
-                            self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value, self.var_name, self.username, self.project_id, self)
+                            self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value,
+                                                       self.var_name, self.username, self.project_id, self)
                             threading.Thread(target=asyncio.run, args=(
-                            self.callback_directory['cloud_update'](variable=self.var_object),)).start()
+                                self.callback_directory['cloud_update'](variable=self.var_object),)).start()
                         self.cloud_last_values[self.var_name] = self.var_value
 
                     self.responses.append(self.response)
                     time.sleep(0.25)
 
+                    if 'tick' in self.callback_directory.keys():
+                        threading.Thread(target=asyncio.run, args=(
+                            self.callback_directory['tick'](),)).start()
+
                     if int(self.proxy_response) == 82:
                         if 'connected' in self.callback_directory.keys() and self.proxy_calls < 2:
                             threading.Thread(target=asyncio.run, args=(
-                                 self.callback_directory['connected'](),)).start()
+                                self.callback_directory['connected'](),)).start()
+
                     else:
-                        self.file = open(__file__, "r", encoding='UTF-8')
+                        self.file = open(self.source, "r", encoding='UTF-8')
                         self.line = ""
                         self.count = 0
                         for i in self.file:
@@ -234,11 +337,31 @@ class Manage:
         :param event: The type of event
         :return: Wrapper
         """
+
         def wrapper(function):
             if str(event.lower()) in self.event_dictionary:
                 self.callback_directory[event.lower()] = function
+                if event.lower() == 'cloud_update':
+                    funonstring = str(inspect.signature(function))
+                    funonstring = funonstring.replace('(', '')
+                    funonstring = funonstring.replace(')', '')
+                    funonstring = funonstring.replace(' ', '')
+                    funonstring = funonstring.split(",")[0]
+                    funonstring = funonstring.split(':')
+                    self.receive_type = None
+                    if len(funonstring) == 1:
+                        self.receive_type = object
+                    else:
+                        if funonstring[1] == 'list':
+                            self.receive_type = list
+                        elif funonstring[1] == 'object':
+                            self.receive_type = object
+                        else:
+                            print("Wrong Data Format Type!")
+
             else:
                 print('event not found!')
+
         return wrapper
 
     async def get_stats(self):
@@ -250,7 +373,6 @@ class Manage:
         """
         self.proxy_response = requests.get('https://api.scratch.mit.edu/projects/' + str(self.project_id)).json()
         return Project(self.proxy_response)
-
 
     async def set_variable(self, variable, value):
         try:
@@ -264,7 +386,7 @@ class Manage:
         except BrokenPipeError:
             print('Broken Pipe Error. Connection Lost.')
             self.ws.connect('wss://clouddata.scratch.mit.edu', cookie='scratchsessionsid=' + self.session_id + ';',
-                       origin='https://scratch.mit.edu', enable_multithread=True)
+                            origin='https://scratch.mit.edu', enable_multithread=True)
             self.ws.send(json.dumps({
                 'method': 'handshake',
                 'user': self.username,
@@ -280,6 +402,17 @@ class Manage:
                 'project_id': self.project_id
             }) + '\n')
 
+    async def get_variable(self, name: str, limit: str = "1000") -> str:
+        try:
+            resp = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" +
+                                str(self.project_id) + "&limit=" + str(limit) + "&offset=0").json()
+            for i in resp:
+                x = i['name']
+                if x == ('☁ ' + str(name)):
+                    return i['value']
+        except Exception:
+            raise Exception('Cloud variable could not be read.')
+
 
 class Project:
     def __init__(self, data):
@@ -287,97 +420,8 @@ class Project:
             setattr(self, key, data[key])
         self.raw = data
 
+
+# In the works
 class ExtensionManager:
     def __init__(self):
         self.extension_manual = None
-
-class Encode:
-    def __init__(self, encode_method=None):
-        if encode_method == None:
-            pass
-        else:
-            pass
-
-class CodecMethod:
-    @staticmethod
-    def default():
-        char_dict = {
-            'a': 10,
-            'b': 11,
-            'c': 12,
-            'd': 13,
-            'e': 14,
-            'f': 15,
-            'g': 16,
-            'h': 17,
-            'i': 18,
-            'j': 19,
-            'k': 20,
-            'l': 21,
-            'm': 22,
-            'n': 23,
-            'o': 24,
-            'p': 25,
-            'q': 26,
-            'r': 27,
-            's': 28,
-            't': 29,
-            'u': 30,
-            'v': 31,
-            'w': 32,
-            'x': 33,
-            'y': 34,
-            'z': 35,
-            '1': 36,
-            '2': 37,
-            '3': 38,
-            '4': 39,
-            '5': 40,
-            '6': 41,
-            '7': 42,
-            '8': 43,
-            '9': 44,
-            '0': 45,
-            '!': 46,
-            '@': 47,
-            '#': 48,
-            '$': 49,
-            '%': 50,
-            '^': 51,
-            '&': 52,
-            '*': 53,
-            '(': 54,
-            ')': 55,
-            '{': 56,
-            '}': 57,
-            '[': 58,
-            ']': 59,
-            '|': 60,
-            ':': 61,
-            ';': 62,
-            '"': 63,
-            '\'': 64,
-            '<': 65,
-            ',': 66,
-            '>': 67,
-            '.': 68,
-            '?': 69,
-            '\\': 70,
-            '/': 71,
-            '`': 72,
-            '~': 73,
-            '☁': 74,
-            ' ': 75,
-            '-': 76,
-            '_': 77,
-            '+': 78,
-            '=': 79,
-        }
-        return char_dict
-
-    @staticmethod
-    def from_file(file_path):
-        if os.path.isfile(file_path):
-            print(f'using {file_path} as the encoding method!')
-        else:
-            print('make sure the file path is correct!')
