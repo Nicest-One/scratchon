@@ -32,6 +32,7 @@ class Client:
         self.username = username
         self.password = password
         self.source = source
+        self.meta = None
 
         self.headers = {
             "x-csrftoken": "a",
@@ -103,7 +104,7 @@ class Client:
 
             }
 
-    def manage(self, project_id: int):
+    def manage(self, project_id: int, codec_method=None):
         """
         This is one of the most important methods, as it allows to connect your scratch and python project.
 
@@ -112,8 +113,11 @@ class Client:
         :rtype: object
         """
 
+        if codec_method != None:
+            self.meta = use_file_for_codec(codec_method, self.discord_link)
+
         try:
-            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source)
+            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source, codec_method=self.meta)
         except:
             self.message = f"{Fore.RED}[scratchon] Prior Exception\n{Fore.YELLOW}  Tip: Check to see if any error's occured prior to this message\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
 
@@ -141,90 +145,55 @@ class Variable:
         self.object = origin
 
 
-class CodecMethod:
-    DEFAULT = {
-        'a': 10,
-        'b': 11,
-        'c': 12,
-        'd': 13,
-        'e': 14,
-        'f': 15,
-        'g': 16,
-        'h': 17,
-        'i': 18,
-        'j': 19,
-        'k': 20,
-        'l': 21,
-        'm': 22,
-        'n': 23,
-        'o': 24,
-        'p': 25,
-        'q': 26,
-        'r': 27,
-        's': 28,
-        't': 29,
-        'u': 30,
-        'v': 31,
-        'w': 32,
-        'x': 33,
-        'y': 34,
-        'z': 35,
-        '1': 36,
-        '2': 37,
-        '3': 38,
-        '4': 39,
-        '5': 40,
-        '6': 41,
-        '7': 42,
-        '8': 43,
-        '9': 44,
-        '0': 45,
-        '!': 46,
-        '@': 47,
-        '#': 48,
-        '$': 49,
-        '%': 50,
-        '^': 51,
-        '&': 52,
-        '*': 53,
-        '(': 54,
-        ')': 55,
-        '{': 56,
-        '}': 57,
-        '[': 58,
-        ']': 59,
-        '|': 60,
-        ':': 61,
-        ';': 62,
-        '"': 63,
-        '\'': 64,
-        '<': 65,
-        ',': 66,
-        '>': 67,
-        '.': 68,
-        '?': 69,
-        '\\': 70,
-        '/': 71,
-        '`': 72,
-        '~': 73,
-        '☁': 74,
-        ' ': 75,
-        '-': 76,
-        '_': 77,
-        '+': 78,
-        '=': 79,
-    }
+def serve_file(path):
+    return path
 
-    @staticmethod
-    def from_file(file_path):
-        if os.path.isfile(file_path):
-            print(f'using {file_path} as the encoding method!')
-        else:
-            print('Make sure the file path is correct!')
+
+def use_file_for_codec(path, discord_link):
+    if os.path.isfile(path):
+        file = open(path)
+        root = {}
+        counter = 0
+        for lines in file:
+            counter += 1
+            if lines != '\n':
+                root[lines.replace('\n', '')] = counter
+        file.close()
+        return CreateCodecClass(root)
+    else:
+        print(f"{Fore.RED}[scratchon] File Not Served\n{Fore.YELLOW}  Tip: Check to see if the file path is correct\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {discord_link} {Fore.RESET}")
+
+
+class CreateCodecClass:
+    def __init__(self, root):
+        self.root = root
+        self.temp = None
+        self.letter = None
+        self.data = None
+
+    def _encode(self, data):
+
+        self.temp = ""
+        for letter in data:
+            self.temp += str(self.root[letter])
+        return self.temp
+
+    def _decode(self, data):
+        self.data = str(data)
+        self.temp = ""
+        for times in range(0, len(self.data), 2):
+            self.letter = self.data[times] + self.data[times + 1]
+            self.temp += self.get_key(int(self.letter))
+        return self.temp
+
+    def get_key(self, val):
+        for key, value in self.root.items():
+            if val == value:
+                return key
 
 
 class Manage:
-    def __init__(self, project_id, session_id, username, discord_link, source, codec_method=CodecMethod.DEFAULT):
+    def __init__(self, project_id, session_id, username, discord_link, source, codec_method):
         """
         A(n) object that represents your scratch project, not meant to be used by the user.
 
@@ -245,6 +214,8 @@ class Manage:
         self.var_object = None
         self.stats, self.message, self.counter = None, None, 0
         self.source = source
+        self.codec_method = codec_method
+        self.is_using_codec = codec_method
 
         self.callback_directory = {}
         self.event_dictionary = ['cloud_update', 'connected', 'tick']
@@ -307,7 +278,8 @@ class Manage:
                         self.message = f"{Fore.RED}[scratchon] Could Not Connect To Project: ID: {self.project_id}\n{Fore.YELLOW}  Tip: Double check to make sure your this project has atleast 1 cloud variable and/or the project id is correct!\n {Fore.BLUE} Suggested Line:\n   {Fore.WHITE} Line: {self.count} | {self.line}  {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
                         print(self.message)
                 except Exception as error:
-                    self.message = f"{Fore.RED}[scratchon] [502] To Much Gateway Traffic for Project: ID: {self.project_id}\n{Fore.YELLOW}  We have slowed down requests for 5 seconds to help.\n{Fore.RESET}  Full Traceback: {error}"
+                    print(error)
+                    self.message = f"{Fore.RED}[scratchon] [502] Too Much Gateway Traffic for Project: ID: {self.project_id}\n{Fore.YELLOW}  We have slowed down requests for 5 seconds to help.\n{Fore.RESET}  Full Traceback: {error}"
                     print(self.message)
                     time.sleep(5)
 
@@ -413,6 +385,20 @@ class Manage:
         except Exception:
             raise Exception('Cloud variable could not be read.')
 
+    def encode(self, value):
+        if self.is_using_codec == None:
+            self.message = f"{Fore.RED}[scratchon] No codec_method has been set for Project: ID: {self.project_id}\n{Fore.YELLOW}  Tip: Make sure to serve a file in scratchon.Client().manage()\n{Fore.MAGENTA}  Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+            print(self.message)
+        else:
+            return self.codec_method._encode(value)
+
+    def decode(self, value):
+        if self.is_using_codec == None:
+            self.message = f"{Fore.RED}[scratchon] No codec_method has been set for Project: ID: {self.project_id}\n{Fore.YELLOW}  Tip: Make sure to serve a file in scratchon.Client().manage()\n{Fore.MAGENTA}  Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+            print(self.message)
+        else:
+            return self.codec_method._decode(value)
+
 
 class Project:
     def __init__(self, data):
@@ -420,7 +406,16 @@ class Project:
             setattr(self, key, data[key])
         self.raw = data
 
- 
+
+def main(myself):
+    discord_link = "https://discord.gg/tF7j7MswUS"
+    if not isinstance(myself, Client):
+        print(f"{Fore.RED}[scratchon] Must run scratchon.main() on scratchon.Client()\n{Fore.YELLOW}  Tip: Check to see if scratchon.Client() is a argument in scratchon.main()\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {discord_link} {Fore.RESET}")
+    else:
+        while True:
+            pass
+
+
 # In the works
 class ExtensionManager:
     def __init__(self):
