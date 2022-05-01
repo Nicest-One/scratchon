@@ -9,6 +9,7 @@ import time
 import asyncio
 import inspect
 import os
+import datetime
 
 
 class Client:
@@ -104,11 +105,12 @@ class Client:
 
             }
 
-    def manage(self, project_id: int, codec_method=None):
+    def manage(self, project_id: int, codec_method=None, compare="time"):
         """
         This is one of the most important methods, as it allows to connect your scratch and python project.
 
         :param project_id: The id of your scratch project you wish to connect to.
+        :param compare: The way to compare cloud variables (time, or value)
         :return: Project instance
         :rtype: object
         """
@@ -117,7 +119,7 @@ class Client:
             self.meta = use_file_for_codec(codec_method, self.discord_link)
 
         try:
-            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source, codec_method=self.meta)
+            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source, codec_method=self.meta, compare=compare)
         except:
             self.message = f"{Fore.RED}[scratchon] Prior Exception\n{Fore.YELLOW}  Tip: Check to see if any error's occured prior to this message\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
 
@@ -193,7 +195,7 @@ class CreateCodecClass:
 
 
 class Manage:
-    def __init__(self, project_id, session_id, username, discord_link, source, codec_method):
+    def __init__(self, project_id, session_id, username, discord_link, source, codec_method, compare):
         """
         A(n) object that represents your scratch project, not meant to be used by the user.
 
@@ -222,6 +224,10 @@ class Manage:
         self.responses = []
         self.cloud_last_values = {}
 
+        self.cloud_last_timestamp = {}
+        self.compare_via = compare.lower()
+        self._created_at = datetime.datetime.now()
+
         self.receive_type = None
 
         self.ws.connect('wss://clouddata.scratch.mit.edu', cookie='scratchsessionsid=' + self.session_id + ';',
@@ -237,21 +243,34 @@ class Manage:
             while self.websocket_connected:
                 try:
                     self.response = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" + str(
-                        self.project_id) + "&limit=1" + "&offset=0").json()
+                        self.project_id) + "&limit=25" + "&offset=0").json()
                     self.response = self.response[0]
                     self.var_name = self.response['name']
                     self.var_value = self.response['value']
-                    self.proxy_calls += 1
-                    if self.var_name not in self.cloud_last_values:
-                        self.cloud_last_values[self.var_name] = self.var_value
+                    self.epoch = self.response['timestamp']
+                    self.action = self.response['verb']
 
-                    if self.cloud_last_values[self.var_name] != self.var_value:
-                        if 'cloud_update' in self.callback_directory.keys():
-                            self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value,
+                    self.when = datetime.datetime.fromtimestamp(self.epoch / 1000.0)
+                    self.dif = self.when - self._created_at
+
+                    self.proxy_calls += 1
+
+                    if self.compare_via == "value":
+                        if self.var_name not in self.cloud_last_values:
+                            self.cloud_last_values[self.var_name] = self.var_value
+
+                        if self.cloud_last_values[self.var_name] != self.var_value:
+                            if 'cloud_update' in self.callback_directory.keys():
+                                self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value,
                                                        self.var_name, self.username, self.project_id, self)
-                            threading.Thread(target=asyncio.run, args=(
-                                self.callback_directory['cloud_update'](variable=self.var_object),)).start()
+                                if self.receive_type == object:
+                                    threading.Thread(target=asyncio.run, args=(
+                                        self.callback_directory['cloud_update'](variable=self.var_object),)).start()
+                                else:
+                                    pass
                         self.cloud_last_values[self.var_name] = self.var_value
+                    elif self.compare_via == "time":
+                        pass
 
                     self.responses.append(self.response)
                     time.sleep(0.25)
@@ -311,28 +330,33 @@ class Manage:
         """
 
         def wrapper(function):
-            if str(event.lower()) in self.event_dictionary:
-                self.callback_directory[event.lower()] = function
-                if event.lower() == 'cloud_update':
-                    funonstring = str(inspect.signature(function))
-                    funonstring = funonstring.replace('(', '')
-                    funonstring = funonstring.replace(')', '')
-                    funonstring = funonstring.replace(' ', '')
-                    funonstring = funonstring.split(",")[0]
-                    funonstring = funonstring.split(':')
-                    self.receive_type = None
-                    if len(funonstring) == 1:
-                        self.receive_type = object
-                    else:
-                        if funonstring[1] == 'list':
-                            self.receive_type = list
-                        elif funonstring[1] == 'object':
+            if str(event.lower()).startswith("?"):
+                self.callback_directory[event.lower()[1:]] = function
+            else:
+                if str(event.lower()) in self.event_dictionary:
+                    self.callback_directory[event.lower()] = function
+                    if event.lower() == 'cloud_update':
+                        funonstring = str(inspect.signature(function))
+                        funonstring = funonstring.replace('(', '')
+                        funonstring = funonstring.replace(')', '')
+                        funonstring = funonstring.replace(' ', '')
+                        funonstring = funonstring.split(",")[0]
+                        funonstring = funonstring.split(':')
+                        self.receive_type = None
+                        if len(funonstring) == 1:
                             self.receive_type = object
                         else:
-                            print("Wrong Data Format Type!")
+                            if funonstring[1] == 'list':
+                                self.receive_type = list
+                            elif funonstring[1] == 'object':
+                                self.receive_type = object
+                            else:
+                                self.message = f"{Fore.RED}[scratchon] return type can only be 'list' or 'object'\n{Fore.MAGENTA}  Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+                                print(self.message)
 
-            else:
-                print('event not found!')
+                else:
+                    self.message = f"{Fore.RED}[scratchon] Invalid Event: event {str(event.lower())} not found\n{Fore.YELLOW}  Tip: Make sure to check you spelled the event name correctly, else, add a ? to event name to make it a custom event\n{Fore.MAGENTA}  Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
+                    print(self.message)
 
         return wrapper
 
@@ -420,3 +444,7 @@ def main(myself):
 class ExtensionManager:
     def __init__(self):
         self.extension_manual = None
+        self.check = None
+        self.version = 0.1
+        self.lol = None
+        self.later = "ate"
