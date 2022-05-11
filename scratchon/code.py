@@ -105,7 +105,7 @@ class Client:
 
             }
 
-    def manage(self, project_id: int, codec_method=None, compare="time"):
+    def manage(self, project_id: int, codec_method=None):
         """
         This is one of the most important methods, as it allows to connect your scratch and python project.
 
@@ -119,7 +119,7 @@ class Client:
             self.meta = use_file_for_codec(codec_method, self.discord_link)
 
         try:
-            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source, codec_method=self.meta, compare=compare)
+            return Manage(project_id, self.sessionId, self.username, self.discord_link, source=self.source, codec_method=self.meta)
         except:
             self.message = f"{Fore.RED}[scratchon] Prior Exception\n{Fore.YELLOW}  Tip: Check to see if any error's occured prior to this message\n {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
 
@@ -195,7 +195,7 @@ class CreateCodecClass:
 
 
 class Manage:
-    def __init__(self, project_id, session_id, username, discord_link, source, codec_method, compare):
+    def __init__(self, project_id, session_id, username, discord_link, source, codec_method):
         """
         A(n) object that represents your scratch project, not meant to be used by the user.
 
@@ -225,10 +225,11 @@ class Manage:
         self.cloud_last_values = {}
 
         self.cloud_last_timestamp = {}
-        self.compare_via = compare.lower()
         self._created_at = datetime.datetime.now()
+        self.triggered = False
+        self.changes = []
 
-        self.receive_type = None
+        self.receive_type = object
 
         self.ws.connect('wss://clouddata.scratch.mit.edu', cookie='scratchsessionsid=' + self.session_id + ';',
                         origin='https://scratch.mit.edu', enable_multithread=True)
@@ -242,35 +243,48 @@ class Manage:
         def call_scratch_api():
             while self.websocket_connected:
                 try:
-                    self.response = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" + str(
+                    self.main_response = requests.get("https://clouddata.scratch.mit.edu/logs?projectid=" + str(
                         self.project_id) + "&limit=25" + "&offset=0").json()
-                    self.response = self.response[0]
-                    self.var_name = self.response['name']
-                    self.var_value = self.response['value']
-                    self.epoch = self.response['timestamp']
-                    self.action = self.response['verb']
-
-                    self.when = datetime.datetime.fromtimestamp(self.epoch / 1000.0)
-                    self.dif = self.when - self._created_at
-
                     self.proxy_calls += 1
+                    self.changes = []
+                    self.triggered = False
+                    
+                    for indexer in range(0, len(self.main_response)):
+                        self.response = self.main_response[(len(self.main_response) - 1) - indexer]
+                        self.var_name = self.response['name']
+                        self.var_value = self.response['value']
+                        self.epoch = self.response['timestamp']
+                        self.action = self.response['verb']
 
-                    if self.compare_via == "value":
-                        if self.var_name not in self.cloud_last_values:
-                            self.cloud_last_values[self.var_name] = self.var_value
+                        self.when = datetime.datetime.fromtimestamp(self.epoch / 1000.0)
 
-                        if self.cloud_last_values[self.var_name] != self.var_value:
-                            if 'cloud_update' in self.callback_directory.keys():
+                        self.after = self.when > self._created_at
+                        if self.var_name not in self.cloud_last_timestamp.keys():
+                            if self.after:
+                                self.cloud_last_timestamp[self.var_name] = self.when
+                                self.cloud_last_values[self.var_name] = self.var_value
+                                self.triggered = True
                                 self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value,
-                                                       self.var_name, self.username, self.project_id, self)
-                                if self.receive_type == object:
-                                    threading.Thread(target=asyncio.run, args=(
-                                        self.callback_directory['cloud_update'](variable=self.var_object),)).start()
-                                else:
-                                    pass
-                        self.cloud_last_values[self.var_name] = self.var_value
-                    elif self.compare_via == "time":
-                        pass
+                                                           self.var_name, self.username, self.project_id, self)
+                                self.changes.append(self.var_object)
+
+                        else:
+                            if self.when > self.cloud_last_timestamp[self.var_name]:
+                                self.cloud_last_timestamp[self.var_name] = self.when
+                                self.cloud_last_values[self.var_name] = self.var_value
+                                self.triggered = True
+                                self.var_object = Variable(self.cloud_last_values[self.var_name], self.var_value,
+                                                           self.var_name, self.username, self.project_id, self)
+                                self.changes.append(self.var_object)
+
+                    if 'cloud_update' in self.callback_directory.keys() and self.triggered:
+                        if self.receive_type == object:
+                            threading.Thread(target=asyncio.run, args=(
+                                self.callback_directory['cloud_update'](variable=self.var_object),)).start()
+                        else:
+                            if self.receive_type == list:
+                                threading.Thread(target=asyncio.run, args=(
+                                    self.callback_directory['cloud_update'](variable=self.changes),)).start()
 
                     self.responses.append(self.response)
                     time.sleep(0.25)
@@ -297,7 +311,6 @@ class Manage:
                         self.message = f"{Fore.RED}[scratchon] Could Not Connect To Project: ID: {self.project_id}\n{Fore.YELLOW}  Tip: Double check to make sure your this project has atleast 1 cloud variable and/or the project id is correct!\n {Fore.BLUE} Suggested Line:\n   {Fore.WHITE} Line: {self.count} | {self.line}  {Fore.MAGENTA}Still Having Trouble? Join Our Discord Community: {self.discord_link} {Fore.RESET}"
                         print(self.message)
                 except Exception as error:
-                    print(error)
                     self.message = f"{Fore.RED}[scratchon] [502] Too Much Gateway Traffic for Project: ID: {self.project_id}\n{Fore.YELLOW}  We have slowed down requests for 5 seconds to help.\n{Fore.RESET}  Full Traceback: {error}"
                     print(self.message)
                     time.sleep(5)
