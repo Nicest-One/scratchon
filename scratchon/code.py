@@ -248,7 +248,7 @@ class Manage:
                     self.proxy_calls += 1
                     self.changes = []
                     self.triggered = False
-                    
+
                     for indexer in range(0, len(self.main_response)):
                         self.response = self.main_response[(len(self.main_response) - 1) - indexer]
                         self.var_name = self.response['name']
@@ -286,7 +286,7 @@ class Manage:
                                 threading.Thread(target=asyncio.run, args=(
                                     self.callback_directory['cloud_update'](variable=self.changes),)).start()
 
-                    self.responses.append(self.response)
+                    self.responses.append(self.main_response)
                     time.sleep(0.25)
 
                     if 'tick' in self.callback_directory.keys():
