@@ -18,4 +18,4 @@ account = scratchon.Client('scratch_username', 'scratch_password')
 
 ### Support?
 #### Discord Server: https://discord.com/invite/tF7j7MswUS
-#### Documentation: https://scratch.mit.edu/projects/655866524/fullscreen/
+#### Documentation: https://scratchon.tk
